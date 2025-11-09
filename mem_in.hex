@@ -276,7 +276,7 @@ A7
 AC
 01
 
-//testing computer_immediate instructions
+//testing compute_immediate instructions
 // addi r3, 5(r2) ; byte-sw
 //r2 contains 00000024
 //r3 is empty
@@ -288,7 +288,19 @@ AC
 51
 00
 
-73      // [0xA4] HALT                    (0x00000073)
+//testing compute instructions
+// add r4, r3, r2
+//r2 contains 00000024
+//r3 contains 00000029
+// funct7(7b)      rs2(5b)    rs1(5b)  funct3   rd    0110011
+// 0000000          00011    00010      000     00100      0110011
+// 00000000001100010000001000110011   ==> 0x00310233
+33       // [0xA4]
+02
+31
+00
+
+73      // [0xA8] HALT                    (0x00000073)
 00
 00
 00

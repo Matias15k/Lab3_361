@@ -95,10 +95,11 @@ module SingleCycleCPU(halt, clk, rst);
                           (opcode ==  `OPCODE_LOAD && (funct3 == `FUNC_LW)) ? DataWord : //lw  
                           (opcode ==  `OPCODE_LOAD && (funct3 == `FUNC_LBU)) ? {{24{1'b0}}, DataWord[7:0]} : //lbu   
                           (opcode ==  `OPCODE_LOAD && (funct3 == `FUNC_LHU)) ? {{16{1'b0}}, DataWord[15:0]} : //lhu  
-                          (opcode ==  `OPCODE_COMPUTE_IMMEDIATE) ? eu_out : 0; //compute_i instructions       
+                          (opcode ==  `OPCODE_COMPUTE_IMMEDIATE) ? eu_out : //compute_i instructions 
+                          (opcode ==  `OPCODE_COMPUTE) ? eu_out : 0; //compute instructions          
          assign cur_inst_type = (opcode == `OPCODE_LUI) ? U_TYPE : 0; //not sure if i need this characterization of instruction type
          assign eu_funct7_in = (opcode == `OPCODE_BRANCH && (funct3 == `FUNC_BEQ | funct3 == `FUNC_BNE)) ? `AUX_FUNC_SUB : //beq, bne 
-                               (opcode == `OPCODE_BRANCH && (funct3 == `FUNC_BLT | funct3 == `FUNC_BGE | funct3 == `FUNC_BLTU | funct3 == `FUNC_BGEU)) ? `AUX_FUNC_ADD : 0; //blt, bge, bltu, bgeu
+                               (opcode == `OPCODE_BRANCH && (funct3 == `FUNC_BLT | funct3 == `FUNC_BGE | funct3 == `FUNC_BLTU | funct3 == `FUNC_BGEU)) ? `AUX_FUNC_ADD : funct7; //blt, bge, bltu, bgeu
          assign eu_funct3_in = (opcode == `OPCODE_BRANCH && (funct3 == `FUNC_BNE)) ? 3'b000 : //bne
                                (opcode == `OPCODE_BRANCH && (funct3 == `FUNC_BLT | funct3 == `FUNC_BGE)) ? 3'b010 : //blt, bge
                                (opcode == `OPCODE_BRANCH && (funct3 == `FUNC_BLTU | funct3 == `FUNC_BGEU)) ? 3'b011 : //bltu, bgeu
@@ -125,7 +126,8 @@ module SingleCycleCPU(halt, clk, rst);
                         (opcode == `OPCODE_JAL) ? 1 : 
                         (opcode == `OPCODE_JALR) ? 1: 
                         (opcode == `OPCODE_LOAD) ? 1:  
-                        (opcode == `OPCODE_COMPUTE_IMMEDIATE) ? 1: 0; 
+                        (opcode == `OPCODE_COMPUTE_IMMEDIATE) ? 1 :  
+                        (opcode == `OPCODE_COMPUTE) ? 1: 0; 
          assign MemWrEn = (opcode == `OPCODE_STORE) ? 1: 0;
 
          
@@ -137,7 +139,8 @@ module SingleCycleCPU(halt, clk, rst);
    assign valid_op = (opcode == `OPCODE_LUI) | (opcode == `OPCODE_AUIPC)|
                      (opcode == `OPCODE_JAL) | (opcode == `OPCODE_JALR) |
                      (opcode == `OPCODE_BRANCH) | (opcode == `OPCODE_LOAD) |
-                     (opcode == `OPCODE_STORE) | (opcode == `OPCODE_COMPUTE_IMMEDIATE);
+                     (opcode == `OPCODE_STORE) | (opcode == `OPCODE_COMPUTE_IMMEDIATE) |
+                     (opcode == `OPCODE_COMPUTE);
                
    // System State 
    Mem   MEM(.InstAddr(PC), .InstOut(InstWord), 
