@@ -29,6 +29,7 @@
    `define FUNC_ADD      3'b000
    `define AUX_FUNC_ADD  7'b0000000
    `define AUX_FUNC_SUB  7'b0100000
+   `define AUX_FUNC_M  7'b0000001
    `define OPCODE_LUI 7'b0110111
    `define OPCODE_AUIPC 7'b0010111
    `define OPCODE_JAL 7'b1101111 
@@ -213,9 +214,17 @@ module ExecutionUnit(out, opA, opB, func, auxFunc);
                OP_SRL = 3'b101,
                OP_SRA= 3'b101,
                OP_OR = 3'b110,
-               OP_AND = 3'b111;
+               OP_AND = 3'b111,
+               OP_MUL = 3'b000,
+               OP_MULHSU = 3'b010,
+               OP_MULHU= 3'b011,
+               OP_DIV = 3'b100,
+               OP_DIVU = 3'b101,
+               OP_REM = 3'b110,
+               OP_REMU = 3'b111;
     localparam FUNC_0 = 7'b0000000,
-               FUNC_1 = 7'b0100000;
+               FUNC_1 = 7'b0100000,
+               FUNC_2 = 7'b0000001;
 
   //Dataflow model
     assign out =
@@ -228,6 +237,35 @@ module ExecutionUnit(out, opA, opB, func, auxFunc);
       (func == OP_SRL && auxFunc == FUNC_0) ? (opA >>  opB[4:0]) :
       (func == OP_SRA && auxFunc == FUNC_1) ? ((opA >> opB[4:0]) | ({32{opA[31]}} << (32 - opB[4:0]))) :
       (func == OP_OR  && auxFunc == FUNC_0) ? (opA | opB) :
-      (func == OP_AND && auxFunc == FUNC_0) ? (opA & opB) : 32'b0;
+      (func == OP_AND && auxFunc == FUNC_0) ? (opA & opB) :
+
+      (func == OP_MUL && auxFunc == FUNC_2) ? (mul_uu[31:0]) : 
+      (func == OP_MULHSU && auxFunc == FUNC_2) ? (mul_su[63:32]) : 
+      (func == OP_MULHU && auxFunc == FUNC_2) ? (mul_ss[63:32]) : 
+      (func == OP_DIV && auxFunc == FUNC_2) ? div_q_signed : 
+      (func == OP_DIVU && auxFunc == FUNC_2) ? div_q_unsigned :
+      (func == OP_REM && auxFunc == FUNC_2) ? rem_r_signed :
+      (func == OP_REMU && auxFunc == FUNC_2) ? rem_r_unsigned : 32'b0;
+
+   //M-instruction processsing ->
+   // 64-bit products for mul variants
+   wire signed   [31:0] sA = opA;
+   wire signed   [31:0] sB = opB;
+   wire         [31:0] uA = opA;
+   wire         [31:0] uB = opB;
+
+   wire signed  [63:0] mul_ss  = sA * sB;
+   wire signed  [63:0] mul_su  = sA * $signed({1'b0, uB});
+   wire         [63:0] mul_uu  = uA * uB;
+
+   wire div_by_zero = (opB == 32'b0);
+   wire signed [31:0] div_q_signed = div_by_zero ? 32'hFFFFFFFF :  // DIV: -1
+                                     (sA == 32'sh80000000 && sB == 32'hFFFFFFFF) ? 32'sh80000000 : // overflow
+                                     sA / sB; //normal division
+   wire [31:0] div_q_unsigned = div_by_zero ? 32'hFFFFFFFF : uA / uB;
+   wire signed [31:0] rem_r_signed = div_by_zero ? sA : 
+                                    (sA == 32'sh80000000 && sB == -32'sd1) ? 32'sd0 :sA % sB;
+   wire [31:0] rem_r_unsigned = div_by_zero ? uA : uA % uB;
+
 
 endmodule // ExecutionUnit
