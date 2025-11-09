@@ -8,6 +8,7 @@
    `define NUM_REGS 32
 //Opcodes
    `define OPCODE_COMPUTE    7'b0110011
+   `define OPCODE_COMPUTE_IMMEDIATE 7'b0010011
    `define OPCODE_BRANCH     7'b1100011
    `define FUNC_BEQ 3'b000
    `define FUNC_BNE 3'b001
@@ -93,7 +94,8 @@ module SingleCycleCPU(halt, clk, rst);
                           (opcode ==  `OPCODE_LOAD && (funct3 == `FUNC_LH)) ? {{16{DataWord[15]}}, DataWord[15:0]} : //lh  
                           (opcode ==  `OPCODE_LOAD && (funct3 == `FUNC_LW)) ? DataWord : //lw  
                           (opcode ==  `OPCODE_LOAD && (funct3 == `FUNC_LBU)) ? {{24{1'b0}}, DataWord[7:0]} : //lbu   
-                          (opcode ==  `OPCODE_LOAD && (funct3 == `FUNC_LHU)) ? {{16{1'b0}}, DataWord[15:0]} :0; //lhu        
+                          (opcode ==  `OPCODE_LOAD && (funct3 == `FUNC_LHU)) ? {{16{1'b0}}, DataWord[15:0]} : //lhu  
+                          (opcode ==  `OPCODE_COMPUTE_IMMEDIATE) ? eu_out : 0; //compute_i instructions       
          assign cur_inst_type = (opcode == `OPCODE_LUI) ? U_TYPE : 0; //not sure if i need this characterization of instruction type
          assign eu_funct7_in = (opcode == `OPCODE_BRANCH && (funct3 == `FUNC_BEQ | funct3 == `FUNC_BNE)) ? `AUX_FUNC_SUB : //beq, bne 
                                (opcode == `OPCODE_BRANCH && (funct3 == `FUNC_BLT | funct3 == `FUNC_BGE | funct3 == `FUNC_BLTU | funct3 == `FUNC_BGEU)) ? `AUX_FUNC_ADD : 0; //blt, bge, bltu, bgeu
@@ -103,7 +105,8 @@ module SingleCycleCPU(halt, clk, rst);
                                (opcode == `OPCODE_LOAD && (funct3 == `FUNC_LB | funct3 == `FUNC_LH | funct3 == `FUNC_LW | funct3 == `FUNC_LBU | funct3 == `FUNC_LHU)) ? 3'b000: //lb, lh, lw, lbu, lhu 
                                (opcode == `OPCODE_STORE && (funct3 == `FUNC_SB | funct3 == `FUNC_SH | funct3 == `FUNC_SW)) ? 3'b000: funct3; //sb, sh, sw
          assign Rdata2_in = (opcode ==  `OPCODE_LOAD && (funct3 == `FUNC_LB | funct3 == `FUNC_LH | funct3 == `FUNC_LW | funct3 == `FUNC_LBU | funct3 == `FUNC_LHU)) ? {{20{imm_i_type[11]}},imm_i_type} : //lb, lh, lw, lbu, lhu
-                            (opcode == `OPCODE_STORE && (funct3 == `FUNC_SB | funct3 == `FUNC_SH | funct3 == `FUNC_SW)) ? {{20{imm_front_s_type[6]}},imm_front_s_type, imm_back_s_type} : Rdata2; //sb, sh, sw
+                            (opcode == `OPCODE_STORE && (funct3 == `FUNC_SB | funct3 == `FUNC_SH | funct3 == `FUNC_SW)) ? {{20{imm_front_s_type[6]}},imm_front_s_type, imm_back_s_type} : //sb, sh, sw
+                            (opcode == `OPCODE_COMPUTE_IMMEDIATE) ? {{20{imm_i_type[11]}},imm_i_type} : Rdata2; //compute_i instructions
          assign DataAddr = (opcode ==  `OPCODE_LOAD && (funct3 == `FUNC_LB | funct3 == `FUNC_LH | funct3 == `FUNC_LW | funct3 == `FUNC_LBU | funct3 == `FUNC_LHU)) ? (eu_out) : //lb, lh, lw, lbu, lhu
                            (opcode == `OPCODE_STORE && (funct3 == `FUNC_SB | funct3 == `FUNC_SH | funct3 == `FUNC_SW)) ? eu_out : 0; //sb, sh, sw
          assign MemSize = (opcode ==  `OPCODE_LOAD && (funct3 == `FUNC_LB | funct3 == `FUNC_LBU)) ? 2'b00 : //lb, lbu
@@ -121,7 +124,8 @@ module SingleCycleCPU(halt, clk, rst);
                         (opcode == `OPCODE_AUIPC) ? 1 : 
                         (opcode == `OPCODE_JAL) ? 1 : 
                         (opcode == `OPCODE_JALR) ? 1: 
-                        (opcode == `OPCODE_LOAD) ? 1: 0;  
+                        (opcode == `OPCODE_LOAD) ? 1:  
+                        (opcode == `OPCODE_COMPUTE_IMMEDIATE) ? 1: 0; 
          assign MemWrEn = (opcode == `OPCODE_STORE) ? 1: 0;
 
          
@@ -132,9 +136,9 @@ module SingleCycleCPU(halt, clk, rst);
 		      ((funct7 == `AUX_FUNC_ADD) || (funct7 == `AUX_FUNC_SUB)));
    assign valid_op = (opcode == `OPCODE_LUI) | (opcode == `OPCODE_AUIPC)|
                      (opcode == `OPCODE_JAL) | (opcode == `OPCODE_JALR) |
-                     (opcode == `OPCODE_BRANCH) | (opcode == `OPCODE_LOAD |
-                     (opcode == `OPCODE_STORE));
-     
+                     (opcode == `OPCODE_BRANCH) | (opcode == `OPCODE_LOAD) |
+                     (opcode == `OPCODE_STORE) | (opcode == `OPCODE_COMPUTE_IMMEDIATE);
+               
    // System State 
    Mem   MEM(.InstAddr(PC), .InstOut(InstWord), 
             .DataAddr(DataAddr), .DataSize(MemSize), .DataIn(StoreData_in), .DataOut(DataWord), .WE(MemWrEn), .CLK(clk));

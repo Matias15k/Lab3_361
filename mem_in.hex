@@ -276,7 +276,19 @@ A7
 AC
 01
 
-73      // [0xA0] HALT                    (0x00000073)
+//testing computer_immediate instructions
+// addi r3, 5(r2) ; byte-sw
+//r2 contains 00000024
+//r3 is empty
+// immediate(12b)      rs1(5b)  funct3   rdst    0010011
+// 000000000101            00010    000      00011   0010011 
+// 00000000010100010000000110010011   ==> 0x00510193
+93       // [0xA0]
+01
+51
+00
+
+73      // [0xA4] HALT                    (0x00000073)
 00
 00
 00
