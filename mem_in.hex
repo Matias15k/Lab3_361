@@ -17,18 +17,22 @@ EF      // [0x08] JAL   x1, +24            (0x018000EF) ... x1 has 0x0C now
 00
 00
 00
+
 13      // [0x10] NOP
 00
 00
 00
+
 13      // [0x14] NOP
 00
 00
 00
+
 13      // [0x18] NOP
 00
 00
 00
+
 13      // [0x1C] NOP
 00
 00
@@ -111,7 +115,6 @@ C8      //reg 1 < reg 2. blt reg1 reg2;  0220C063, should branch, pc = pc + 16
 
 //b type general structure: 0000001 00001  00010   101     00000  1100011
 //                          +16      rs2   rs1    func3            opcode                                    
-
 //reg5 > reg1, bge reg1 reg5;  0220C063, should not branch, pc = pc + 4
 // 0000001 00101 00001 101 00000 1100011 => 0x0250D063
 63     // [0x5c] BGE 

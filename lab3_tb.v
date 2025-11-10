@@ -24,7 +24,7 @@ module tb;
 
         // Read commandline options
         if (!$value$plusargs("MEM_IN=%s", mem_in_fname))
-            mem_in_fname = "mem_in.hex";
+            mem_in_fname = "memmul.hex";
         if (!$value$plusargs("REGS_IN=%s", regs_in_fname))
             regs_in_fname = "regs_in.hex";
         if (!$value$plusargs("REGS_OUT=%s", regs_out_fname))
@@ -50,7 +50,7 @@ module tb;
         $dumpvars();
 
         // Feel free to modify to inspect whatever you want
-        #0 $monitor($time,, "PC=%08x IR=%08x halt=%x exit=%x", CPU.PC, CPU.InstWord, halt, exit);
+        #0 $monitor($time,, "PC=%08x IR=%08x EU_OUT=%08x halt=%x exit=%x", CPU.PC, CPU.InstWord, CPU.eu_out, halt, exit);
 
         // Exit???
         wait(exit);

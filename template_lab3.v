@@ -1,6 +1,6 @@
 // Template for Northwestern - CompEng 361 - Lab3 -- Version 1.1
 // Groupname: Zach Tey, Matias Ketema
-// NetIDs: vcs5888, 
+// NetIDs: vcs5888, tnc5178
 
 // Some useful defines...please add your own
 //General Parameters
@@ -192,24 +192,17 @@ module SingleCycleCPU(halt, clk, rst);
 endmodule // SingleCycleCPU
 
 
-// Incomplete version of Lab2 execution unit
-// You will need to extend it. Feel free to modify the interface also
+
 module ExecutionUnit(out, opA, opB, func, auxFunc);
    output [`WORD_WIDTH-1:0] out;
    input [`WORD_WIDTH-1:0]  opA, opB;
    input [2:0] 	 func;
    input [6:0] 	 auxFunc;
-
-   // wire [`WORD_WIDTH-1:0] 	 addSub;
-
-   // // Only supports add and subtract
-   // assign addSub = (auxFunc == 7'b0100000) ? (opA - opB) : (opA + opB);
-   // assign out = (func == 3'b000) ? addSub : 32'hXXXXXXXX;
    
    //Copied over from Zach's Lab 2
    //define operation codes
-    localparam OP_ADD = 3'b000; //localparam only exists inside the module
-    localparam OP_SUB = 3'b000,
+    localparam OP_ADD = 3'b000, //localparam only exists inside the module
+               OP_SUB = 3'b000,
                OP_SLL = 3'b001,
                OP_SLT  = 3'b010,
                OP_SLTU = 3'b011,
@@ -218,13 +211,16 @@ module ExecutionUnit(out, opA, opB, func, auxFunc);
                OP_SRA= 3'b101,
                OP_OR = 3'b110,
                OP_AND = 3'b111,
+               ///////////////
                OP_MUL = 3'b000,
+               OP_MULH = 3'b001,
                OP_MULHSU = 3'b010,
                OP_MULHU= 3'b011,
                OP_DIV = 3'b100,
                OP_DIVU = 3'b101,
                OP_REM = 3'b110,
                OP_REMU = 3'b111;
+
     localparam FUNC_0 = 7'b0000000,
                FUNC_1 = 7'b0100000,
                FUNC_2 = 7'b0000001;
@@ -243,8 +239,9 @@ module ExecutionUnit(out, opA, opB, func, auxFunc);
       (func == OP_AND && auxFunc == FUNC_0) ? (opA & opB) :
 
       (func == OP_MUL && auxFunc == FUNC_2) ? (mul_uu[31:0]) : 
+      (func == OP_MULH && auxFunc == FUNC_2) ? (mul_ss[63:32]) : 
       (func == OP_MULHSU && auxFunc == FUNC_2) ? (mul_su[63:32]) : 
-      (func == OP_MULHU && auxFunc == FUNC_2) ? (mul_ss[63:32]) : 
+      (func == OP_MULHU && auxFunc == FUNC_2) ? (mul_uu[63:32]) : 
       (func == OP_DIV && auxFunc == FUNC_2) ? div_q_signed : 
       (func == OP_DIVU && auxFunc == FUNC_2) ? div_q_unsigned :
       (func == OP_REM && auxFunc == FUNC_2) ? rem_r_signed :
@@ -255,10 +252,12 @@ module ExecutionUnit(out, opA, opB, func, auxFunc);
    wire signed   [31:0] sA = opA;
    wire signed   [31:0] sB = opB;
    wire         [31:0] uA = opA;
-   wire         [31:0] uB = opB;
-
+   wire         [31:0] uB = opB; 
+   wire signed  [63:0] sextsA = { {32{sA[31]}}, sA };
+   wire signed  [63:0] zext_uB = {32'b0, sB};
+   wire signed  [63:0] uB_new = zext_uB;
    wire signed  [63:0] mul_ss  = sA * sB;
-   wire signed  [63:0] mul_su  = sA * $signed({1'b0, uB});
+   wire signed  [63:0] mul_su = $signed(sextsA) * $signed(uB_new);
    wire         [63:0] mul_uu  = uA * uB;
 
    wire div_by_zero = (opB == 32'b0);
