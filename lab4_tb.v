@@ -24,16 +24,16 @@ module tb;
 
         // Read commandline options
         if (!$value$plusargs("MEM_IN=%s", mem_in_fname))
-            mem_in_fname = "mem_in.hex";
+            mem_in_fname = "mem_in_pipelined.hex";
         if (!$value$plusargs("REGS_IN=%s", regs_in_fname))
-            regs_in_fname = "regs_in.hex";
+            regs_in_fname = "regs_in_pipelined.hex";
         if (!$value$plusargs("REGS_OUT=%s", regs_out_fname))
-            regs_out_fname = "regs_out.hex";
+            regs_out_fname = "regs_out_pipelined.hex";
         if (!$value$plusargs("MEM_OUT=%s", mem_out_fname))
 
-            mem_out_fname = "mem_out.hex";
+            mem_out_fname = "mem_out_pipelined.hex";
          if (!$value$plusargs("DUMP=%s", signal_dump_fname))
-            signal_dump_fname = "single.vcd";
+            signal_dump_fname = "pipelined.vcd";
 
         // Clock and reset steup
         #0 rst = 0; exit = 0; clk = 0;

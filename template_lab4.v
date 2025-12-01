@@ -106,7 +106,7 @@ module PipelinedCPU(halt, clk, rst);
    wire [31:0] IFID_IR_in = IFID_flush ? 32'h00000013 : InstWord; // ADDI x0,x0,0 = NOP
 
    Reg #(.width(32)) IFID_PC_REG (.Din(PC),        .Qout(IFID_PC), .WE(IFID_WE), .CLK(clk), .RST(rst));
-   Reg #(.width(32)) IFID_IR_REG (.Din(IFID_IR_in),.Qout(IFID_IR), .WE(IFID_WE), .CLK(clk), .RST(rst));
+   Reg #(.width(32), .init(32'h00000013)) IFID_IR_REG (.Din(IFID_IR_in), .Qout(IFID_IR), .WE(IFID_WE), .CLK(clk), .RST(rst));
 
    //Branching/Jumping Logic for next PC
    wire EX_do_redirect = IsJal_EX | IsJalr_EX | EX_branch_taken;   //either from EX output's PC_target (branch/jump) or increment PC normally
@@ -191,13 +191,14 @@ module PipelinedCPU(halt, clk, rst);
    assign IsJalr_ID   = (opcode == `OPCODE_JALR);
    assign Size_ID     = (opcode == `OPCODE_LOAD | opcode == `OPCODE_STORE) ? ID_IR[13:12] : 2'b00;
    assign BranchFunct3_ID = funct3;
+   wire bad_op_ID = ~valid_op_ID;
    //Pack control signals into one large signal/register since they consist of many smaller sized chunks
    //This goes into EX stage
-      localparam IDEX_CTRL_W = 1+1+1+1+1+1+2+3; // RegWrite,MemWrite,MemRead,MemToReg,IsBranch,IsJal/Jalr,Size,BranchFunct3
+      localparam IDEX_CTRL_W = 1+1+1+1+1+1+1+2+3+1; // RegWrite,MemWrite,MemRead,MemToReg,IsBranch,IsJal/Jalr,Size,BranchFunct3, bad_op
       wire [IDEX_CTRL_W-1:0] IDEX_ctrl_in, IDEX_ctrl_out;
       assign IDEX_ctrl_in = {RegWrite_ID, MemWrite_ID, MemRead_ID, MemToReg_ID,
                            IsBranch_ID, IsJal_ID, IsJalr_ID,
-                           Size_ID, BranchFunct3_ID};
+                           Size_ID, BranchFunct3_ID, bad_op_ID};
    
 
 
@@ -211,6 +212,7 @@ module PipelinedCPU(halt, clk, rst);
    wire [1:0]  IDEX_SR_control;
    wire        IDEX_WE = ~long_latency_stall_ID;
    wire        IDEX_flush; // from hazard unit
+   wire        bad_op_EX;
 
    Reg #(32) IDEX_PC_REG     (.Din(ID_PC),           .Qout(IDEX_PC),       .WE(IDEX_WE), .CLK(clk), .RST(rst));
    Reg #(32) IDEX_R1_REG     (.Din(Rdata1),          .Qout(IDEX_R1),       .WE(IDEX_WE), .CLK(clk), .RST(rst));
@@ -238,7 +240,7 @@ module PipelinedCPU(halt, clk, rst);
     assign {
         RegWrite_EX, MemWrite_EX, MemRead_EX, MemToReg_EX,
         IsBranch_EX, IsJal_EX, IsJalr_EX,
-        Size_EX, BranchFunct3_EX
+        Size_EX, BranchFunct3_EX, bad_op_EX
     } = IDEX_ctrl_out;
 
    //Halt logic
@@ -247,7 +249,7 @@ module PipelinedCPU(halt, clk, rst);
                      (opcode == `OPCODE_BRANCH) | (opcode == `OPCODE_LOAD) |
                      (opcode == `OPCODE_STORE) | (opcode == `OPCODE_COMPUTE_IMMEDIATE) |
                      (opcode == `OPCODE_COMPUTE);
-   assign halt = (~valid_op_ID) | memory_alignment_error_MEM;
+   assign halt = bad_op_WB | memory_alignment_error_MEM; 
 
    //Load-use hazard
    wire load_use_hazard = MemRead_EX && (IDEX_rd != 5'd0) && ((IDEX_rd == Rsrc1) || (IDEX_rd == Rsrc2));
@@ -338,8 +340,8 @@ module PipelinedCPU(halt, clk, rst);
    
    //Pipeline Reg, EX/MEM
       
-      // Control bus EX → MEM = {RegWrite, MemWrite, MemRead, MemToReg, IsJal, IsJalr, Size[1:0], LoadFunct3[2:0]}
-      localparam EXMEM_CTRL_W = 1+1+1+1+1+1+2+3;
+      // Control bus EX → MEM = {RegWrite, MemWrite, MemRead, MemToReg, IsJal, IsJalr, Size[1:0], LoadFunct3[2:0], bad_op}
+      localparam EXMEM_CTRL_W = 1+1+1+1+1+1+2+3+1;
       wire [EXMEM_CTRL_W-1:0] EXMEM_ctrl_in, EXMEM_ctrl_out;
 
    assign EXMEM_ctrl_in = {
@@ -350,7 +352,8 @@ module PipelinedCPU(halt, clk, rst);
       IsJal_EX,
       IsJalr_EX,
       Size_EX,        // 2 bits
-      IDEX_funct3     // use funct3 for load type in WB
+      IDEX_funct3,     // use funct3 for load type in WB
+      bad_op_EX
    };
 
    wire [31:0] EXMEM_ALU_out;       // address for load/store OR ALU result
@@ -362,6 +365,7 @@ module PipelinedCPU(halt, clk, rst);
    wire        RegWrite_MEM, MemWrite_MEM, MemRead_MEM, MemToReg_MEM;
    wire        IsJal_MEM, IsJalr_MEM;
    wire EXMEM_WE = ~stall_EX;
+   wire bad_op_MEM;
 
    // Pipeline registers:
    Reg #(32) EXMEM_ALU_REG   (.Din(EX_result), .Qout(EXMEM_ALU_out),    .WE(EXMEM_WE), .CLK(clk), .RST(rst));
@@ -385,7 +389,8 @@ module PipelinedCPU(halt, clk, rst);
       IsJal_MEM,
       IsJalr_MEM,
       EXMEM_Size,        // 2 bits
-      EXMEM_funct3       // 3 bits: load funct3 when opcode was LOAD
+      EXMEM_funct3,       // 3 bits: load funct3 when opcode was LOAD
+      bad_op_MEM
    } = EXMEM_ctrl_out;
 
 
@@ -438,15 +443,16 @@ module PipelinedCPU(halt, clk, rst);
          (EXMEM_Size == `SIZE_WORD  && DataAddr[1:0] != 2'b00)) // word must be 4-byte aligned
       );
 
-   //Control bus MEM -> WB = {RegWrite, MemToReg, IsJal, IsJalr, LoadFunct3[2:0]}
-   localparam MEMWB_CTRL_W = 1+1+1+1+3;
+   //Control bus MEM -> WB = {RegWrite, MemToReg, IsJal, IsJalr, LoadFunct3[2:0], bad_op}
+   localparam MEMWB_CTRL_W = 1+1+1+1+3+1;
    wire [MEMWB_CTRL_W-1:0] MEMWB_ctrl_in, MEMWB_ctrl_out;
    assign MEMWB_ctrl_in = {
       RegWrite_MEM,
       MemToReg_MEM,
       IsJal_MEM,
       IsJalr_MEM,
-      EXMEM_funct3      // for loads
+      EXMEM_funct3,      // for loads
+      bad_op_MEM
    };
 
    //MEM/WB Pipeline Regs
@@ -456,6 +462,7 @@ module PipelinedCPU(halt, clk, rst);
    wire [4:0]  MEMWB_rd;
    wire [2:0]  MEMWB_funct3;
    wire        RegWrite_WB, MemToReg_WB, IsJal_WB, IsJalr_WB;
+   wire bad_op_WB;
 
    // Data regs
    Reg #(32) MEMWB_ALU_REG  (.Din(EXMEM_ALU_out), .Qout(MEMWB_ALU_out),   .WE(1'b1), .CLK(clk), .RST(rst));
@@ -477,7 +484,8 @@ module PipelinedCPU(halt, clk, rst);
       MemToReg_WB,
       IsJal_WB,
       IsJalr_WB,
-      MEMWB_funct3
+      MEMWB_funct3,
+      bad_op_WB
    } = MEMWB_ctrl_out;
 
 
